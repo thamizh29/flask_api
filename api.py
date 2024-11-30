@@ -25,7 +25,7 @@ def get_data():
 
 @app.route('/create_data', methods=['POST'])
 def create_data():
-    # Create a new collection (MongoDB will create the collection if it doesn't exist)
+   
     collection = mongo.db.users  # This is the 'users' collection within 'myDatabase'
     
     # Get the data from the POST request (JSON data)
