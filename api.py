@@ -1,40 +1,72 @@
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify
 from flask_pymongo import PyMongo
+from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
+import datetime
 
-# Initialize the Flask application
 app = Flask(__name__)
 
-# MongoDB configuration
-app.config["MONGO_URI"] = "mongodb://localhost:27017/user_account"  # Use your MongoDB URI here
+# MongoDB Configuration
+app.config["MONGO_URI"] = "mongodb://localhost:27017/auth_db"
 mongo = PyMongo(app)
 
-@app.route('/')
-def home():
-    return "Welcome to the Flask MongoDB App!"
+# Secret key for JWT (use a secure random value in production)
+SECRET_KEY = "58e2b02dc130d44d2dcd4f9ffefe0667992afc5decdff51d5402a6e2ab9a0565"
 
-# Route to fetch data from MongoDB
-@app.route('/get_data')
-def get_data():
-    # Access the 'users' collection
+@app.route('/signup', methods=['POST'])
+def signup():
     users_collection = mongo.db.users
-    # Fetch all users from the collection
-    users = users_collection.find()
-    # Convert the users data to a list and return as JSON
-    users_list = [{'name': user['name'], 'email': user['email']} for user in users]
-    return jsonify(users_list)
-
-@app.route('/create_data', methods=['POST'])
-def create_data():
-   
-    collection = mongo.db.users  # This is the 'users' collection within 'myDatabase'
-    
-    # Get the data from the POST request (JSON data)
     user_data = request.get_json()
-    
-    # Insert the data into the collection
-    collection.insert_one(user_data)
 
-    return jsonify({"message": "Data inserted successfully!"}), 201
+    # Validate input data
+    if not user_data or 'email' not in user_data or 'password' not in user_data:
+        return {"status": "error", "message": "Invalid input data"}, 400
 
-if __name__ == "__main__":
+    # Check if the user already exists
+    if users_collection.find_one({"email": user_data['email']}):
+        return {"status": "error", "message": "User already exists"}, 409
+
+    # Hash the password before storing it
+    hashed_password = generate_password_hash(user_data['password'])
+
+    # Insert the new user into the database
+    users_collection.insert_one({
+        "email": user_data['email'],
+        "password": hashed_password,
+        "created_at": datetime.datetime.utcnow()
+    })
+
+    return {"status": "success", "message": "User registered successfully"}, 201
+
+@app.route('/login', methods=['POST'])
+def login():
+    users_collection = mongo.db.users
+    login_data = request.get_json()
+
+    # Validate input data
+    if not login_data or 'email' not in login_data or 'password' not in login_data:
+        return {"status": "error", "message": "Invalid input data"}, 400
+
+    # Fetch the user from the database
+    user = users_collection.find_one({"email": login_data['email']})
+    if not user:
+        return {"status": "error", "message": "User not found"}, 404
+
+    # Verify the password
+    if not check_password_hash(user['password'], login_data['password']):
+        return {"status": "error", "message": "Invalid password"}, 401
+
+    # Generate JWT token
+    payload = {
+        "email": user['email'],
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1)  # Token expires in 1 hour
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+    return {"status": "success", "token": token}, 200
+@app.route('/forget',methods=['POST'])
+def forget():
+    return
+
+if __name__ == '__main__':
     app.run(debug=True)
