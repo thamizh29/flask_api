@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_pymongo import PyMongo
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
@@ -12,6 +12,10 @@ mongo = PyMongo(app)
 
 # Secret key for JWT (use a secure random value in production)
 SECRET_KEY = "58e2b02dc130d44d2dcd4f9ffefe0667992afc5decdff51d5402a6e2ab9a0565"
+
+@app.route('/')
+def home():
+    return render_template('signup.html')
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -36,7 +40,12 @@ def signup():
         "created_at": datetime.datetime.utcnow()
     })
 
-    return {"status": "success", "message": "User registered successfully"}, 201
+    return {"status": "success", "message": "User registered successfully"}, 200
+@app.route('/view', methods=['GET'])
+def view():
+    users_collection = mongo.db.users
+    users = list(users_collection.find({}, {"_id": 0}))  # Exclude _id field
+    return jsonify(users)
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -69,4 +78,4 @@ def forget():
     return
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host= '0.0.0.0')
